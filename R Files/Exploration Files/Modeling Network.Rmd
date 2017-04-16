@@ -1,0 +1,29 @@
+---
+title: "Untitled"
+author: "Evan Green"
+date: "3/28/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,eval = FALSE)
+```
+
+Potential features that could be useful:
+
+Percent of time that tie has been there
+What percent of that time it was reciprocal
+Grade when we worked together, if applicable, for the sink 
+f->f
+f->m
+m->f
+m->m
+Is it closing some transitivity (how do I make predictions using this? Leave one out?)
+Average Degrees of source
+Average degrees of sink
+centrality of source and sink (betweenness, eigen, constraint)
+Avg Grade of source
+avg grade of sink 
+Member of the largest component 
+count of number of people this person has an in_degree with
+count of number of peopel this person has an out_degree with 

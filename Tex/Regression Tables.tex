@@ -1,0 +1,189 @@
+\documentclass[a4paper]{article}
+
+%% Language and font encodings
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+
+%% Sets page size and margins
+\usepackage[a4paper,top=3cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+%% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{Your Paper}
+\author{You}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Your abstract.
+\end{abstract}
+
+\subsection{How to add Tables}
+
+% Table created by stargazer v.5.2 by Marek Hlavac, Harvard University. E-mail: hlavac at fas.harvard.edu
+% Date and time: Sun, Apr 09, 2017 - 20:12:06
+\begin{table}[!htbp] \centering 
+  \caption{Predicting Count of Edges} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{1}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-2} 
+\\[-1.8ex] & Count \\ 
+\hline \\[-1.8ex] 
+ Same\_Gender & 0.288$^{*}$ \\ 
+  & (0.164) \\ 
+  & \\ 
+ Reciprocal & 1.111$^{***}$ \\ 
+  & (0.279) \\ 
+  & \\ 
+ Recip\_pct & 0.784$^{***}$ \\ 
+  & (0.300) \\ 
+  & \\ 
+ I(Grades\_Sink \textgreater  Grades\_Sink\_Collab) & $-$1.064$^{***}$ \\ 
+  & (0.198) \\ 
+  & \\ 
+ I(Grades\_Source \textgreater  Grades\_Source\_Collab) & $-$1.280$^{***}$ \\ 
+  & (0.193) \\ 
+  & \\ 
+ Grades\_Source & 0.131$^{***}$ \\ 
+  & (0.025) \\ 
+  & \\ 
+ Grades\_Sink & 0.171$^{***}$ \\ 
+  & (0.034) \\ 
+  & \\ 
+ Grades\_Source\_Collab & $-$0.122$^{***}$ \\ 
+  & (0.032) \\ 
+  & \\ 
+ Grades\_Sink\_Collab & $-$0.157$^{***}$ \\ 
+  & (0.037) \\ 
+  & \\ 
+ I(Transitivity\_PCT \textgreater = 0.25) & 1.198$^{***}$ \\ 
+  & (0.209) \\ 
+  & \\ 
+ Constant & 2.302$^{***}$ \\ 
+  & (0.200) \\ 
+  & \\ 
+\hline \\[-1.8ex] 
+Observations & 520 \\ 
+R$^{2}$ & 0.443 \\ 
+Adjusted R$^{2}$ & 0.432 \\ 
+Residual Std. Error & 1.684 (df = 509) \\ 
+F Statistic & 40.515$^{***}$ (df = 10; 509) \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+
+
+% Table created by stargazer v.5.2 by Marek Hlavac, Harvard University. E-mail: hlavac at fas.harvard.edu
+% Date and time: Fri, Apr 14, 2017 - 12:22:04
+\begin{table}[!htbp] \centering 
+  \caption{Predicting Grades without Restriction} 
+  \label{Note: Coefficients for individual students are removed for ease of viewing} 
+\begin{tabular}{@{\extracolsep{5pt}}lc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{1}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-2} 
+\\[-1.8ex] & Grade \\ 
+\hline \\[-1.8ex] 
+ Ave\_Score\_of\_Helpees & 0.334$^{***}$ \\ 
+  & (0.045) \\ 
+  & \\ 
+ Out\_Degree & 0.172$^{**}$ \\ 
+  & (0.073) \\ 
+  & \\ 
+\hline \\[-1.8ex] 
+Observations & 990 \\ 
+R$^{2}$ & 0.644 \\ 
+Adjusted R$^{2}$ & 0.599 \\ 
+Residual Std. Error & 3.334 (df = 878) \\ 
+F Statistic & 14.301$^{***}$ (df = 111; 878) \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\textit{Note:}  &  Ability scores are removed for brevity \\ 
+\end{tabular} 
+\end{table} 
+
+% Table created by stargazer v.5.2 by Marek Hlavac, Harvard University. E-mail: hlavac at fas.harvard.edu
+% Date and time: Sun, Apr 09, 2017 - 20:48:25
+\begin{table}[!htbp] \centering 
+  \caption{Predicting Test Grades} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{1}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-2} 
+\\[-1.8ex] & Grade \\ 
+\hline \\[-1.8ex] 
+ Ave\_Score\_of\_Helpers & 0.726$^{***}$ \\ 
+  & (0.202) \\ 
+  & \\ 
+ In\_Degree & $-$1.885$^{***}$ \\ 
+  & (0.510) \\ 
+  & \\ 
+ Ave\_Score\_of\_Helpees & $-$0.874$^{***}$ \\ 
+  & (0.197) \\ 
+  & \\ 
+ Recip\_Degree & 1.703$^{***}$ \\ 
+  & (0.505) \\ 
+  & \\ 
+ Ave\_Grade & 0.794$^{***}$ \\ 
+  & (0.065) \\ 
+  & \\ 
+ Constant & 1.243$^{*}$ \\ 
+  & (0.685) \\ 
+  & \\ 
+\hline \\[-1.8ex] 
+Observations & 220 \\ 
+R$^{2}$ & 0.546 \\ 
+Adjusted R$^{2}$ & 0.536 \\ 
+Residual Std. Error & 3.149 (df = 214) \\ 
+F Statistic & 51.562$^{***}$ (df = 5; 214) \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+
+2016 Gender Statistics
+Started Class
+Received Any Points
+Finished Class
+Men
+100
+92
+86
+Women
+32
+26
+23
+Non-Binary
+2
+1
+1
+Total
+134
+119
+110
+
+
+
+
+
+
+
+\end{document}

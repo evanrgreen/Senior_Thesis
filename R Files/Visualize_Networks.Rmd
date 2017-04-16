@@ -1,0 +1,195 @@
+---
+title: "Visualizing the Network"
+author: "Evan Green"
+date: "2/21/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+```{r setwd and load packages and data }
+library(igraph)
+library(dplyr)
+library('network') 
+library('sna')
+library('ndtv')
+library('visNetwork')
+library(RColorBrewer)
+
+k_num_psets <- 7
+nice_colors <- brewer.pal(5,"Set1")
+setwd("/Users/evangreen/Desktop/Senior\ Thesis/Grade\ Data")
+
+grades <- read.csv("FullGrades.csv", as.is=T, strip.white = TRUE)
+genders <- read.csv("CodeGender.csv", as.is = T, strip.white=TRUE)
+grades <- merge(genders,grades,by.x = "code",by.y = "student")
+
+mylist <- list()
+my_files <- paste("CollabPS", 1:7, ".csv", sep = "")
+names_vec <- paste("CollabPS", 1:7, sep = "")
+raw_collabs <- lapply(my_files, read.csv, as.is = T,strip.white = TRUE)
+names(raw_collabs) <- names_vec
+```
+
+
+```{r function to create edge lists}
+create_edge_list <- function(raw_file,cutoff = 20){
+  #get rid
+  raw_file$collabs <- unlist(sapply(raw_file$collabs,
+                                    function(x)gsub("\\[|\\]", "", x)))
+  edges <- as.data.frame(matrix(NA,ncol=2,nrow=100))
+  colnames(edges) <- c("Source","Sink")
+  edge_num <- 1
+  over_reports <- 0 
+  for(student in unique(raw_file$student)){
+    student_entries <- which(raw_file$student==student)
+    sources <- raw_file[student_entries[length(student_entries)], "collabs"]
+    sources <- strsplit(sources,split=", ")[[1]]
+    num_collabs <- length(sources)
+    if( num_collabs > cutoff){
+      over_reports <- over_reports + 1
+      next
+    }else{
+      for(elt in unique(sources)){
+        if (elt != student & elt != 0 & student != 0){
+          edges[edge_num, "Source"]<- trimws(elt)
+          edges[edge_num, "Sink"] <- trimws(student)
+          edge_num <- edge_num + 1 
+        }
+      }
+    }
+  }
+  edges <- edges[!is.na(edges$Source),]
+  
+  cat("There were", over_reports, "Over reports with a cutoff of", cutoff,"\n")
+  return(edges)
+}
+```
+
+How do I deal with people who are listed who dropped the class? 
+
+I'm going to assume that that is a mistake for the guy who only has somethign for th second test 
+
+For people who dropped after 4, I will keep the edges that they are in but not analyze their grades
+
+```{r create graphs}
+edge_lists <- lapply(raw_collabs,create_edge_list,100)
+
+
+people_who_dropped <- grades[grades$did_drop_after4,1]
+lapply(edge_lists, function(x) sum(x[,1] %in% people_who_dropped |
+                                     x[,2] %in% people_who_dropped))
+
+#my plan is 
+
+people_who_dropped <- grades[grades$did_drop_immediately,1]
+
+
+remove_edge_mistakes <- function(edges, banned_people = people_who_dropped){
+  column_1 <- edges[,1] %in% banned_people
+  column_2 <- edges[,2] %in% banned_people
+  return(edges[!column_1 & !column_2, ])
+}
+
+edge_lists <- lapply(edge_lists,remove_edge_mistakes)
+
+graphs <- lapply(edge_lists, graph.data.frame,
+                 vertices=grades[!grades$code %in%people_who_dropped,])
+```
+
+```{r collapse the network}
+set.seed(36)
+g_full <- NULL
+for(i in 1:k_num_psets){
+  if(is.null(g_full)){
+    g_full <- graphs[[i]]
+  }else{
+    #This makes it based on the layout of all the graphs 
+    g_full <- g_full %u% graphs[[i]]
+  }
+}
+#save the layout so all the sociograms are in the same diagram
+save_layout <- layout_with_fr(g_full) 
+
+
+```
+
+
+
+```{r visualize the graphs }
+
+range(save_layout)
+
+save_layout <- norm_coords(save_layout, xmin = -1.5, xmax = 1.5, ymin = -1, ymax = 1.1,
+  zmin = -1, zmax = 1)
+size <- 3
+for(i in 1:k_num_psets){
+  #png(filename = paste(letters[i],".png",sep = ""), 
+  #    width = 5, height = 5, units = 'in', res = 1000)
+  plot(graphs[[i]],
+       edge.arrow.size=.2,
+       edge.width = .4,
+       vertex.frame.color=nice_colors[as.numeric(as.factor(V(graphs[[i]])$Sex))],
+       vertex.size=grades[!grades$code %in%people_who_dropped,paste("hw",i,sep="")]/ 9,
+       vertex.color=nice_colors[as.numeric(as.factor(V(graphs[[i]])$Sex))],
+       vertex.label="",
+       main = i,
+       layout = save_layout,
+       rescale=FALSE)
+   legend("topright",col =nice_colors[c(3,2,1)],
+         legend = c("M","F","?"),pch= 16,cex=.8,
+         bty="n")
+   #dev.off()
+}
+```
+
+```{r people_who_never_collabed }
+did_collab <- function(student, edges = edge_lists) {
+  for(i in 1:7){
+    if(student %in% edges[[i]][,1] | student %in% edges[[i]][,2]){
+      return(TRUE)
+    }
+  }
+  return(FALSE)
+}
+people_who_collabed <- sapply(grades$code,did_collab)
+a<-grades$code[!people_who_collabed]
+b<-grades$code[grades$did_drop_immediately]
+
+grades[grades$code %in% setdiff(a,b),]
+
+
+
+```
+
+7 is a part of the class but never collaborated while 40, 92, and 132 were all dropped early and never collaborated 
+
+```{r}
+adg <- lapply(graphs, get.adjacency)
+adg <- lapply(adg, as.matrix)
+
+networks <- lapply(adg,as.network, 
+                   vertex.attr = grades[!grades$code %in%people_who_dropped])
+plot(networks[[1]])
+a <- networkDynamic(network.list=networks)
+
+
+for_vertex_col <- nice_colors[as.numeric(as.factor(grades$Sex[!grades$code %in% people_who_dropped]))]
+render.d3movie(a,displaylabels=TRUE,
+               vertex.col = for_vertex_col,
+               label = NA,
+               animationDuration=1000)
+?render.d3movie
+```
+
+
+
+```{r make gif}
+make_gif <-F
+if(make_gif){
+  system("convert -delay 150 *collab*.png plot.gif")
+}
+```
+

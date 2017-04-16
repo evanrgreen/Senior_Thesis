@@ -1,0 +1,477 @@
+---
+title: "Grade Regressions"
+author: "Evan Green"
+date: "3/8/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r setwd and load packages and data }
+library(igraph)
+library(dplyr)
+k_num_psets <- 7
+nice_colors <- RColorBrewer::brewer.pal(5,"Set1")
+setwd("/Users/evangreen/Desktop/Senior\ Thesis/Grade\ Data")
+
+grades <- read.csv("FullGrades.csv", as.is=T, strip.white = TRUE)
+genders <- read.csv("CodeGender.csv", as.is = T, strip.white=TRUE)
+grades <- merge(genders,grades,by.x = "code",by.y = "student")
+
+mylist <- list()
+my_files <- paste("CollabPS", 1:7, ".csv", sep = "")
+names_vec <- paste("CollabPS", 1:7, sep = "")
+raw_collabs <- lapply(my_files, read.csv, as.is = T,strip.white = TRUE)
+names(raw_collabs) <- names_vec
+```
+
+
+```{r function to create edge lists}
+create_edge_list <- function(raw_file,cutoff = 20){
+  #get rid
+  raw_file$collabs <- unlist(sapply(raw_file$collabs,function(x)gsub("\\[|\\]", "", x)))
+  edges <- as.data.frame(matrix(NA,ncol=2,nrow=100))
+  colnames(edges) <- c("Source","Sink")
+  edge_num <- 1
+  over_reports <- 0 
+  for(student in unique(raw_file$student)){
+    student_entries <- which(raw_file$student==student)
+    sources <- raw_file[student_entries[length(student_entries)], "collabs"]
+    sources <- strsplit(sources,split=", ")[[1]]
+    num_collabs <- length(sources)
+    if( num_collabs > cutoff){
+      over_reports <- over_reports + 1
+      next
+    }else{
+      for(elt in unique(sources)){
+        if (elt != student & elt != 0 & student != 0){
+          edges[edge_num, "Source"]<- trimws(elt)
+          edges[edge_num, "Sink"] <- trimws(student)
+          edge_num <- edge_num + 1 
+        }
+      }
+    }
+  }
+  edges <- edges[!is.na(edges$Source),]
+  
+  cat("There were", over_reports, "Over reports with a cutoff of", cutoff,"\n")
+  return(edges)
+}
+```
+
+How do I deal with people who are listed who dropped the class? 
+
+I'm going to assume that that is a mistake for the guy who only has somethign for th second test 
+
+For people who dropped after 4, I will keep the edges that they are in but not analyze their grades
+
+```{r create graphs}
+edge_lists <- lapply(raw_collabs,create_edge_list,100)
+
+
+people_who_dropped <- grades[grades$did_drop_after4,1]
+lapply(edge_lists, function(x) sum(x[,1] %in% people_who_dropped | x[,2] %in% people_who_dropped))
+
+#my plan is 
+
+people_who_dropped <- grades[grades$did_drop_immediately,1]
+
+
+
+
+remove_edge_mistakes <- function(edges, banned_people = people_who_dropped){
+  column_1 <- edges[,1] %in% banned_people
+  column_2 <- edges[,2] %in% banned_people
+  return(edges[!column_1 & !column_2, ])
+}
+
+edge_lists <- lapply(edge_lists,remove_edge_mistakes)
+
+create_graph_list <- function(edges){
+  graphs <- list()
+  for(i in 1:length(edges)){
+    if(i <= 5){
+      people_who_dropped <- grades[grades$did_drop_immediately,1]
+    }else{
+      people_who_dropped <- grades[grades$did_drop_after4,1]
+    }
+    graphs[[i]] <- graph.data.frame(edges[[i]],
+                                    vertices=grades[!grades$code %in%people_who_dropped,])
+  }
+  return(graphs)
+}
+graphs <- create_graph_list(edge_lists)
+
+```
+
+#question to answer: How much better are we at predicting grades when you are able to take into account the network? 
+This could be complicated by the fact that other grades on homeworks especiallly are related to the collaboration and 
+
+probably multiple chunks are required, make sure that you include betweenness and membership in the largest component 
+
+```{r prepare data frames for this }
+grades_2 <- read.csv("Grades_Imputed.csv",as.is = T,strip.white = T)
+grades_3 <- rbind(grades_2,grades)
+grades_3 <- grades_3[!duplicated(grades_3$code),]
+grades_3 <- grades_3[order(grades_3$code),]
+
+create_data_for_model <- function(spec_graph,grade_info = grades_3, hw_num=1){
+  members <- V(spec_graph)$name
+  df <- grade_info
+  rownames(df) <- grade_info$code
+  df <- df[members,]
+  df$isMale <- df$Sex == "m"
+  df$isFemale <- df$Sex == "f"
+  df$Eigen <- eigen_centrality(spec_graph)$vector
+  df$Betweenness <- betweenness(spec_graph)
+  df$Constraint <- constraint(spec_graph)
+  df$Constraint[is.nan(df$Constraint)] <- 1.5
+  comp <- components(spec_graph)
+  df$Component_Size <- comp$csize[comp$membership]
+  df$Big_Component <- df$Component_Size > 50
+  df$Out_Degree <- degree(spec_graph, mode = "out")
+  df$In_Degree <- degree(spec_graph, mode = "in")
+  #compute average score of neighbors
+  if(TRUE){
+    df$Ave_Score_of_Helpers <- 0
+    df$Ave_Score_of_Helpees <- 0
+    for(mem in members){
+      neigh <- neighbors(spec_graph,mem,mode = "in")
+      if(length(neigh) > 0){
+        df$Ave_Score_of_Helpers[df$code == mem] <- mean(df[neigh,paste("hw", 
+                                                                                    hw_num,
+                                                                                    sep="")])
+      }
+      
+      neigh <- neighbors(spec_graph,mem,mode = "out")
+      if(length(neigh) > 0){
+        df$Ave_Score_of_Helpees[df$code == mem] <- mean(df[neigh,
+                                                           paste("hw", 
+                                                                 hw_num,
+                                                                 sep="")])
+      }
+    }
+  }
+  #remove the people who dropped the class at some point 
+  df <- df[!df$did_drop_after4,]
+
+  
+  df$Target <- df[,paste("hw",hw_num,sep = "")]
+  df <- df[,!(colnames(df) %in% c("Sex","did_drop_after4",
+                                "did_drop_immediately",
+                                paste("hw",hw_num,sep = "")))]
+  return(df)
+}
+
+graph_data_sets <- list()
+for(i in 1:k_num_psets){
+  graph_data_sets[[i]] <- create_data_for_model(graphs[[i]], hw_num = i)
+}
+
+mse <- function(y , model, new_data = NULL){
+  if(is.null(new_data)){
+    return(mean((y - predict(model)) ** 2))
+  }else{
+    return(mean((y - predict(model,new_data)) ** 2))
+  }
+}
+```
+
+
+
+```{r train many different models }
+library(randomForest)
+library(MASS)
+
+
+#This ensures that each grop has the same number of participants 
+n_folds <- 10
+set.seed(100)
+folds_i <- lapply(1:7,
+                  function(x) sample(rep(1:n_folds,
+                                         length.out = sum(!grades$did_drop_after4))))
+
+
+ridge_mse <- function(model, y, new_data){
+  y.pred <- as.matrix(cbind(const=1,new_data[,colnames(new_data) %in% gsub("TRUE","",names(coef(model)))])) %*% coef(model)
+  return(mean((y - y.pred) ** 2))
+}
+
+n_tree <- 500
+
+for(i in 1:k_num_psets){
+  cv_df <-data.frame(matrix(NA, ncol = n_folds, nrow = 15))
+  rownames(cv_df) <- c("lm_test","rf_test","ridge_test",
+                       "lm_hw","rf_hw", "ridge_hw",
+                       "lm_test_net","rf_test_net","ridge_test_net",
+                       "lm_net","rf_net","ridge_net",
+                       "lm_every","rf_every","ridge_every") 
+  for(fold in 1:n_folds){
+    
+    #####Just Test ######
+    lm_tests <- lm(data = graph_data_sets[[i]],
+              Target ~ test1 + test2,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1) %% 10)))
+    cv_df["lm_test",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = lm_tests,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    rf_tests <- randomForest(data = graph_data_sets[[i]],
+              Target ~ test1 + test2,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              ntree = n_tree)
+    cv_df["rf_test",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = rf_tests,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+
+    
+    
+    ridge_tests <- lm.ridge(data = graph_data_sets[[i]],
+              Target ~ test1 + test2,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              lambda = .5)
+    cv_df["ridge_test",fold] <- ridge_mse(model = ridge_tests,
+             y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+             new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    #####Just Test and HW ######
+    lm_hw <- stepAIC(lm(data = graph_data_sets[[i]],
+              Target ~ . - code - Eigen - Betweenness - Constraint - Component_Size
+              -Big_Component - Out_Degree - In_Degree - Ave_Score_of_Helpees -
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1) %% 10))),
+              trace = 0)
+    cv_df["lm_hw",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = lm_hw,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    #rf model with homework info
+    rf_hw <- randomForest(data = graph_data_sets[[i]],
+               Target ~ . - code - Eigen - Betweenness - Constraint - Component_Size
+              -Big_Component - Out_Degree - In_Degree - Ave_Score_of_Helpees -
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              ntree = n_tree)
+    cv_df["rf_hw",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = rf_hw,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    ridge_hw <- lm.ridge(data = graph_data_sets[[i]],
+              Target ~ . - code - Eigen - Betweenness - Constraint - Component_Size
+              -Big_Component - Out_Degree - In_Degree - Ave_Score_of_Helpees -
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              lambda = .5)
+    cv_df["ridge_hw",fold] <- ridge_mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = ridge_hw,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    
+    
+    #####Just Test and Network######
+    lm_test_net <- stepAIC(lm(data = graph_data_sets[[i]],
+              Target ~ test1+test2+ Eigen + Betweenness + Constraint + Component_Size
+              + Big_Component + Out_Degree + In_Degree + Ave_Score_of_Helpees +
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1) %% 10))),
+              trace = 0)
+    cv_df["lm_test_net",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = lm_test_net,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    rf_test_net <- randomForest(data = graph_data_sets[[i]],
+               Target ~ test1+test2+ Eigen + Betweenness + Constraint + Component_Size
+              + Big_Component + Out_Degree + In_Degree + Ave_Score_of_Helpees +
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              ntree = n_tree)
+    cv_df["rf_test_net",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = rf_test_net,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    ridge_test_net <- lm.ridge(data = graph_data_sets[[i]],
+              Target ~ test1+test2+ Eigen + Betweenness + Constraint + Component_Size
+              + Big_Component + Out_Degree + In_Degree + Ave_Score_of_Helpees +
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              lambda = .5)
+    cv_df["ridge_test_net",fold] <- ridge_mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = ridge_test_net,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+         #####Just Network######
+        lm_net <- stepAIC(lm(data = graph_data_sets[[i]],
+              Target ~  Eigen + Betweenness + Constraint + Component_Size
+              + Big_Component + Out_Degree + In_Degree + Ave_Score_of_Helpees +
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1) %% 10))),
+              trace = 0)
+    cv_df["lm_net",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = lm_net,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    rf_net <- randomForest(data = graph_data_sets[[i]],
+               Target ~  Eigen + Betweenness + Constraint + Component_Size
+              + Big_Component + Out_Degree + In_Degree + Ave_Score_of_Helpees +
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              ntree = n_tree)
+    cv_df["rf_net",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = rf_net,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    ridge_net <- lm.ridge(data = graph_data_sets[[i]],
+              Target ~  Eigen + Betweenness + Constraint + Component_Size
+              + Big_Component + Out_Degree + In_Degree + Ave_Score_of_Helpees +
+                Ave_Score_of_Helpers,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              lambda = .5)
+    cv_df["ridge_net",fold] <- ridge_mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = ridge_net,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    
+    
+    #linear model with everything
+    lm_every <- stepAIC(lm(data = graph_data_sets[[i]],
+              Target ~ . - code,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1) %% 10))),
+              trace = 0,
+              direction = "both")
+    cv_df["lm_every",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = lm_every,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    #rf with everything 
+    rf_every <- randomForest(data = graph_data_sets[[i]],
+              Target ~ . -code,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),
+              ntree = n_tree)
+    cv_df["rf_every",fold] <- mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = rf_every,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+    ridge_every <- lm.ridge(data = graph_data_sets[[i]],
+              Target ~ . - code,
+              subset = !(folds_i[[i]] %in% c(fold,(fold + 1) %% 10)),
+              lambda = .5)
+    cv_df["ridge_every",fold] <- ridge_mse(y = graph_data_sets[[i]]$Target[folds_i[[i]] == fold],
+        model = ridge_every,
+        new_data = graph_data_sets[[i]][folds_i[[i]] == fold,])
+    
+  }
+  print(i)
+  print(rowMeans(cv_df))
+  barplot(rowMeans(cv_df),las=2,col = nice_colors[1:3])
+}
+
+
+plot(rf_every$predicted, graph_data_sets[[i]][!(folds_i[[i]] %in% c(fold,(fold + 1)%% 10)),"Target"] ,xlim = c(0,30),ylim = c(0,30))
+abline(a=0,b=1)
+barplot(rf_every$importance,beside = T,
+        names.arg = rownames(rf_every$importance),las = 2 )
+```
+
+
+
+
+
+
+
+
+```{r homophily or causal}
+
+grades_2 <- read.csv("Grades_Imputed.csv",as.is = T,strip.white = T)
+grades_3 <- rbind(grades_2,grades)
+grades_3 <- grades_3[!duplicated(grades_3$code),]
+grades_3 <- grades_3[order(grades_3$code),]
+
+
+full_data_set <- grades_3
+rownames(full_data_set) <- full_data_set$code
+for(i in 1:k_num_psets){
+  full_data_set <- merge(full_data_set,graph_data_sets[[i]][,c("code","Ave_Score_of_Helpers","Constraint")],
+                         suffixes = c(,i), by = "code")
+}
+full_data_set
+
+```
+
+
+
+
+
+
+
+Most of the code below this basically sucks 
+
+
+```{r}
+hw_num <- 2
+table(graph_data_sets[[hw_num]]$Constraint)
+graph_data_sets[[hw_num]][is.nan(graph_data_sets[[hw_num]]$Constraint),]
+hist(graph_data_sets[[hw_num]]$Constraint)
+
+colnames(graph_data_sets[[hw_num]])
+rf_no_graph <- randomForest(data =graph_data_sets[[hw_num]],
+             Target ~ -code+ isFemale+ hw1 + hw3 + hw4 + hw5 + hw6 + hw7 + test1 + test2,
+             importance = T)
+mse(graph_data_sets[[hw_num]]$hw1, rf_no_graph)
+
+
+rf_with_graph <- randomForest(data =graph_data_sets[[hw_num]],
+             Target ~  .-code,
+             importance = T)
+barplot(rf_with_graph$importance[,1],names.arg = rownames(rf_with_graph$importance),
+        las = 2)
+mse(graph_data_sets[[hw_num]]$hw1, rf_with_graph)
+
+rf_with_graph_2 <- randomForest(data =graph_data_sets[[hw_num]],
+             Target ~ hw5 + test1 + test2 + Constraint,
+             importance = T)
+mse(graph_data_sets[[hw_num]]$Target, rf_with_graph_2)
+
+
+lm_everything <- stepAIC(lm(data = graph_data_sets[[hw_num]],
+   formula = Target ~ . - code))
+summary(lm_everything)
+mse(graph_data_sets[[hw_num]]$Target, lm_everything)
+plot(lm_everything)
+
+
+hist(predict(lm_everything),breaks = 10)
+hist(graph_data_sets[[hw_num]]$hw1, breaks =10)
+
+
+
+lm_no_graph <- stepAIC(lm(data = graph_data_sets[[hw_num]],
+   formula = Target ~  isMale + hw1 + hw3 + hw4 + hw5 + hw6 + hw7 + test1 + test2 ))
+summary(lm_no_graph)
+mse(graph_data_sets[[hw_num]]$Target, lm_no_graph)
+plot(lm_no_graph)
+
+
+#A couple students did really poorly on hw 1 but not on others
+#Mayber don't do homework one since it might be the most like that 
+a<-graph_data_sets[[1]]
+a$Pred <- predict(lm_no_graph)
+plot(a$Pred,a$hw1)
+abline(a=0,b=1)
+a[c(12,72,28),]
+
+
+b<-graph_data_sets[[2]]
+b[c(71,79,94),]
+table(graph_data_sets[[2]]$hw2)
+
+#dumb baseline 
+mean((graph_data_sets[[hw_num]]$hw1- mean(graph_data_sets[[hw_num]]$hw1))**2)
+```
+
+
+```{r test the different models with and without collaboration information}
+
+```
+

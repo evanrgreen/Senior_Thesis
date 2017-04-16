@@ -1,0 +1,213 @@
+
+
+######iterative solving of this problem #####
+
+
+```{r iteratively solving problem definitely didn't work}
+n_trials <- 100
+
+ability <- rowMeans(full_data_set[,grepl("hw|test",colnames(full_data_set))])
+help <- 0.03 
+
+grade_data <- full_data_set[,grepl("hw|test",colnames(full_data_set))]
+help_data <- full_data_set[,grepl("Ave_Score_of_Helpers",colnames(full_data_set))]
+constraint_data <- full_data_set[,grepl("C",colnames(full_data_set))]
+
+abilitY_mat <- matrix(NA, ncol = 110,nrow = n_trials/2)
+help_save <- rep(0,n_trials/2)
+for(i in 1:n_trials){
+  if(i %% 2 == 1){
+    #update ability
+    new_grades <- grade_data
+    new_grades <- new_grades[,1:7] - help * help_data
+    ability <- rowMeans(new_grades)
+    abilitY_mat[i/2,] <- ability
+    
+  }else{
+    #update Help coefficent 
+    ability_errors <- (grade_data[,1:7] - ability)
+    ####When you do this, there are Inf #####
+    #you can ignore these because no value of help can make these better#
+    #so setting them equal to 0 gets the maximal value of help#
+    divided <- as.matrix(ability_errors / help_data)
+    divided[is.infinite(divided)] <- 0
+    help <- mean(divided)
+    help_save[i - i %/% 2] <- help
+  }
+}
+
+plot(help_save)
+```
+
+
+```{r check accuracy }
+error_dif <- 0
+ability_0 <- rowMeans(full_data_set[,grepl("hw|test",colnames(full_data_set))])
+for(i in 1:k_num_psets){
+  mu1 <- ability +help * help_data[,i]
+  
+  print(i)
+  error_dif <- error_dif - mean((full_data_set[,paste("hw",i, sep = "")] - mu1)**2)
+  error_dif <- error_dif + mean((full_data_set[,paste("hw",i, sep = "")] - ability_0)**2)
+  print(mean((full_data_set[,paste("hw",i, sep = "")] - mu1)**2))
+  print(mean((full_data_set[,paste("hw",i, sep = "")] - ability_0)**2))
+}
+print("test")
+for(i in 1:2){
+  mu1 <- ability
+  print(i)
+  error_dif <- error_dif - mean((full_data_set[,paste("test",i, sep = "")] - mu1)**2)
+  error_dif <- error_dif + mean((full_data_set[,paste("test",i, sep = "")] - ability_0)**2)
+  print(mean((full_data_set[,paste("test",i, sep = "")] - mu1)**2))
+  print(mean((full_data_set[,paste("test",i, sep = "")] - ability_0)**2))
+}
+print(error_dif)
+
+```
+
+
+
+
+
+####Markov Chain Monte Carlo below #####
+
+
+
+The parameters are "ability" for each person, coefficient for score of helpers, coefficient for constraint, variance of scores
+
+```{r liklihood}
+####
+calc_liklihood <- function(ability, help, openness, spread = 5,grades = full_data_set){
+  liklihood <- 1 
+  #liklihood <- 1
+  
+  for(i in 1:(7+2)){
+    if(i <= k_num_psets){
+        mu1 <- ability + help *  grades[,paste("Ave_Score_of_Helpers", i, sep = "_")] + openness *  grades[,paste("Constraint", i, sep = "_")]
+    }else{
+      mu1 <- ability  + openness * 1.5 #This is what happens 
+    }
+    
+
+    #liklihood <- liklihood + sum(log(dnorm(grades[,paste("hw",i, sep = "")],mean=mu1,sd=spread)))
+    
+    
+    #liklihood <-  liklihood * exp(-1/(2*spread*spread) * sum((grades[,paste("hw",i, sep = "")] - mu1) ** 2)) * 1/ (spread ** length(mu1)) * 10**90
+    
+    liklihood <- liklihood * prod(16 * dnorm(grades[,paste(ifelse(i <= k_num_psets,"hw","test"),ifelse(i <= k_num_psets,i,i-7), sep = "")],mean=mu1,sd=spread))
+    
+    #liklihood <- liklihood + sum((grades[,paste(ifelse(i <= k_num_psets,"hw","test"),ifelse(i <= k_num_psets,i,i-7), sep = "")] - mu1) ** 2)
+  }
+  
+  
+   #tests
+  #for(i in 1:2){
+  #  mu1 <- ability 
+    #liklihood <- liklihood + sum(log(dnorm(grades[,paste("test",i, sep = "")],mean=mu1,sd=spread)))
+  #  liklihood <- liklihood * prod(16 * dnorm(grades[,paste("test",i, sep = "")],mean=mu1,sd=spread))
+    
+    #liklihood <-  liklihood * exp(-1/(2*spread*spread) * sum((grades[,paste("test",i, sep = "")] - mu1) ** 2)) * 1/ (spread ** length(mu1)) 
+    
+   # liklihood <- liklihood + (grades[,paste("test",i, sep = "")] - mu1) ** 2
+    
+  #}
+  #print(liklihood)
+  return(liklihood)
+}
+
+```
+
+
+```{r run mcmc}
+
+######from Joe Chang's STAT 238 Notes #####
+# Here is what does the MCMC (Metropolis method):
+nit=100000/1
+num_students <- nrow(full_data_set)
+results = matrix(0, nrow=nit, ncol=num_students+3)
+ability_0 <- rowMeans(full_data_set[,grepl("hw|test",colnames(full_data_set))])
+help <- 0
+#help <- .03
+openness <- 0
+#openness <- -0.7660835
+spread <- mean(apply(full_data_set[,grepl("hw|test",colnames(full_data_set))],2,sd))
+spread <- 3.5
+th_0 = c(ability_0, help, openness, spread)
+th = c(ability_0, help, openness, spread)
+results[1,] = th
+
+num_accept <- 0
+for(it in 2:nit){
+  
+  #cand <- th + c(rnorm(length(th)-1,sd=.15),0)
+
+  cand <- rep(0,110+3)
+  cand[1:110] <- th[1:110] + rnorm(length(th)-3,sd=.0009)
+  cand[111:112] <- th[111:112] + rnorm(2,sd=.009)
+  cand[113] <- th[113] #+rnorm(1,sd=.001)
+  ratio <- calc_liklihood(cand[1:num_students], cand[num_students+1],
+                          cand[num_students+2], cand[num_students+3]) / 
+    calc_liklihood(th[1:num_students],th[num_students+1],
+                   th[num_students+2],th[num_students+3])
+  if(runif(1) < ratio){
+    th <- cand
+    num_accept <- num_accept+1
+  } 
+  results[it,] <- th
+  if(it %% 10000 == 0){
+    print(it)
+  }
+}
+barplot(th)
+calc_liklihood(th[1:num_students],th[num_students+1],
+                           th[num_students+2],th[num_students+3])
+
+calc_liklihood(th_0[1:num_students],th_0[num_students+1],
+                           th_0[num_students+2],th_0[num_students+3])
+
+mean(abs(th-th_0))
+
+#constraint negative
+mean(results[,num_students+2]<0)
+
+#help positive
+mean(results[,num_students+1]>0)
+num_accept / nit
+```
+
+
+```{r test MCMC accuracy}
+
+error_dif <- 0
+ability_0 <- rowMeans(full_data_set[,grepl("hw|test",colnames(full_data_set))])
+for(i in 1:k_num_psets){
+  mu1 <- th[1:num_students] + th[num_students+1] *  full_data_set[,paste("Ave_Score_of_Helpers", i, sep = "_")] + th[num_students+2] *  full_data_set[,paste("Constraint", i, sep = "_")]
+  
+  print(i)
+  error_dif <- error_dif - mean((full_data_set[,paste("hw",i, sep = "")] - mu1)**2)
+  error_dif <- error_dif + mean((full_data_set[,paste("hw",i, sep = "")] - ability_0)**2)
+  print(mean((full_data_set[,paste("hw",i, sep = "")] - mu1)**2))
+  print(mean((full_data_set[,paste("hw",i, sep = "")] - ability_0)**2))
+}
+print("test")
+for(i in 1:2){
+  mu1 <- th[1:num_students] + th[num_students+2] *1.5
+  print(i)
+  error_dif <- error_dif - mean((full_data_set[,paste("test",i, sep = "")] - mu1)**2)
+  error_dif <- error_dif + mean((full_data_set[,paste("test",i, sep = "")] - ability_0)**2)
+  print(mean((full_data_set[,paste("test",i, sep = "")] - mu1)**2))
+  print(mean((full_data_set[,paste("test",i, sep = "")] - ability_0)**2))
+}
+#Want this to be positive
+print("Difference in Errors")
+print(error_dif)
+
+
+```
+
+If we let the ability scores range too much, I can't get better
+If I only allow help and openness to change, then I can get some decent results 
+
+
+
+
