@@ -6,10 +6,10 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
 ```
 
-```{r setwd and load packages and data }
+```{r setwd and load packages and data, message=FALSE, warning=FALSE, include=FALSE}
 library(igraph)
 library(dplyr)
 library('network') 
@@ -34,7 +34,7 @@ names(raw_collabs) <- names_vec
 ```
 
 
-```{r function to create edge lists}
+```{r function to create edge lists, include=FALSE}
 create_edge_list <- function(raw_file,cutoff = 20){
   #get rid
   raw_file$collabs <- unlist(sapply(raw_file$collabs,
@@ -68,23 +68,21 @@ create_edge_list <- function(raw_file,cutoff = 20){
 }
 ```
 
-How do I deal with people who are listed who dropped the class? 
 
-I'm going to assume that that is a mistake for the guy who only has somethign for th second test 
-
-For people who dropped after 4, I will keep the edges that they are in but not analyze their grades
-
-```{r create graphs}
+```{r create graphs, include = FALSE}
+#For people who dropped after 4,
+#I will keep the edges that they are in but not analyze their grades
 edge_lists <- lapply(raw_collabs,create_edge_list,100)
 
 
 people_who_dropped <- grades[grades$did_drop_after4,1]
-lapply(edge_lists, function(x) sum(x[,1] %in% people_who_dropped |
-                                     x[,2] %in% people_who_dropped))
+lapply(edge_lists, function(x) sum(x[,1] %in% people_who_dropped | x[,2] %in% people_who_dropped))
 
 #my plan is 
 
 people_who_dropped <- grades[grades$did_drop_immediately,1]
+
+
 
 
 remove_edge_mistakes <- function(edges, banned_people = people_who_dropped){
@@ -95,11 +93,23 @@ remove_edge_mistakes <- function(edges, banned_people = people_who_dropped){
 
 edge_lists <- lapply(edge_lists,remove_edge_mistakes)
 
-graphs <- lapply(edge_lists, graph.data.frame,
-                 vertices=grades[!grades$code %in%people_who_dropped,])
+create_graph_list <- function(edges){
+  graphs <- list()
+  for(i in 1:length(edges)){
+    if(i <= 5){
+      people_who_dropped <- grades[grades$did_drop_immediately,1]
+    }else{
+      people_who_dropped <- grades[grades$did_drop_after4,1]
+    }
+    graphs[[i]] <- graph.data.frame(edges[[i]],
+                                    vertices=grades[!grades$code %in%people_who_dropped,])
+  }
+  return(graphs)
+}
+graphs <- create_graph_list(edge_lists)
 ```
 
-```{r collapse the network}
+```{r collapse the network, include = FALSE}
 set.seed(36)
 g_full <- NULL
 for(i in 1:k_num_psets){
@@ -117,35 +127,37 @@ save_layout <- layout_with_fr(g_full)
 ```
 
 
+```{r visualize the graphs, include=TRUE}
+save_layout <- layout_with_fr(graphs[[1]]%u% graphs[[7]])
 
-```{r visualize the graphs }
-
-range(save_layout)
-
-save_layout <- norm_coords(save_layout, xmin = -1.5, xmax = 1.5, ymin = -1, ymax = 1.1,
-  zmin = -1, zmax = 1)
-size <- 3
 for(i in 1:k_num_psets){
-  #png(filename = paste(letters[i],".png",sep = ""), 
-  #    width = 5, height = 5, units = 'in', res = 1000)
+  png(filename = paste("Problem_Set_",i,".png",sep = ""), 
+      width = 5, height = 5, units = 'in', res = 1000)
+  to_exclude <- people_who_dropped
+  if(i > 5){
+    to_exclude <- grades$code[grades$did_drop_after4]
+  }
   plot(graphs[[i]],
        edge.arrow.size=.2,
        edge.width = .4,
        vertex.frame.color=nice_colors[as.numeric(as.factor(V(graphs[[i]])$Sex))],
-       vertex.size=grades[!grades$code %in%people_who_dropped,paste("hw",i,sep="")]/ 9,
+       vertex.size=grades[!grades$code %in% to_exclude,paste("hw",i,sep="")]/ 9,
        vertex.color=nice_colors[as.numeric(as.factor(V(graphs[[i]])$Sex))],
-       vertex.label="",
-       main = i,
-       layout = save_layout,
-       rescale=FALSE)
+       vertex.label="", #V(graphs[[i]])$code,
+       vertex.label.cex = .4,
+       vertex.label.dist = .25,
+       main = paste("Problem Set",i),
+       layout = layout_with_fr(graphs[[i]]),
+       rescale=T)
    legend("topright",col =nice_colors[c(3,2,1)],
          legend = c("M","F","?"),pch= 16,cex=.8,
          bty="n")
-   #dev.off()
+   dev.off()
 }
+
 ```
 
-```{r people_who_never_collabed }
+```{r people_who_never_collabed , include = FALSE}
 did_collab <- function(student, edges = edge_lists) {
   for(i in 1:7){
     if(student %in% edges[[i]][,1] | student %in% edges[[i]][,2]){
@@ -160,33 +172,38 @@ b<-grades$code[grades$did_drop_immediately]
 
 grades[grades$code %in% setdiff(a,b),]
 
-
+#7 is a part of the class but never collaborated
+#while 40, 92, and 132 were all dropped early and never collaborated 
 
 ```
 
-7 is a part of the class but never collaborated while 40, 92, and 132 were all dropped early and never collaborated 
 
-```{r}
+
+```{r, include = FALSE}
 adg <- lapply(graphs, get.adjacency)
 adg <- lapply(adg, as.matrix)
 
 networks <- lapply(adg,as.network, 
                    vertex.attr = grades[!grades$code %in%people_who_dropped])
-plot(networks[[1]])
-a <- networkDynamic(network.list=networks)
+
+test <- networks[[1]]
+
+names(networks) <- paste("Problem Set", 1:7)
+a <- networkDynamic(network.list=networks,vertex.pid = "vertex.names")
 
 
 for_vertex_col <- nice_colors[as.numeric(as.factor(grades$Sex[!grades$code %in% people_who_dropped]))]
 render.d3movie(a,displaylabels=TRUE,
                vertex.col = for_vertex_col,
                label = NA,
-               animationDuration=1000)
-?render.d3movie
+               animationDuration=1000,
+               vertex.cex = rowMeans(grades[!grades$code %in% people_who_dropped,3:9])/30)
+
 ```
 
 
 
-```{r make gif}
+```{r make gif, include = FALSE}
 make_gif <-F
 if(make_gif){
   system("convert -delay 150 *collab*.png plot.gif")

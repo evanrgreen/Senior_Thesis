@@ -117,7 +117,7 @@ write.csv(grades,file = "Grades_Imputed.csv",row.names = F)
 ```
 
 
-```{r}
+```{r, include=FALSE}
 table(grades$hw7)
 
 apply(grades,2,table)

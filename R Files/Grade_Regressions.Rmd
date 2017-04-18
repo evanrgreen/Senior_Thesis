@@ -8,9 +8,10 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE,eval = TRUE)
 ```
 
-```{r setwd and load packages and data }
+```{r setwd and load packages and data, include = FALSE }
 library(igraph)
 library(dplyr)
+library(stats4)
 library(ggplot2)
 library(MASS)
 library(stargazer)
@@ -33,7 +34,7 @@ names(raw_collabs) <- names_vec
 ```
 
 
-```{r function to create edge lists}
+```{r function to create edge lists, include = FALSE}
 create_edge_list <- function(raw_file,cutoff = 20){
   #get rid
   raw_file$collabs <- unlist(sapply(raw_file$collabs,function(x)gsub("\\[|\\]", "", x)))
@@ -68,7 +69,7 @@ create_edge_list <- function(raw_file,cutoff = 20){
 
 
 
-```{r create graphs}
+```{r create graphs, include = FALSE}
 #How do I deal with people who are listed who dropped the class? 
 #I'm going to assume that that is a mistake for the guy who
 #only has somethign for th second test 
@@ -114,17 +115,23 @@ graphs <- create_graph_list(edge_lists)
 
 ```
 
-#question to answer: How much better are we at predicting grades when you are able to take into account the network? 
-This could be complicated by the fact that other grades on homeworks especiallly are related to the collaboration and 
+```{r read in files, include=FALSE}
+#question to answer: How much better are we at predicting grades when
+#you are able to take into account the network? 
+#This could be complicated by the fact that other grades on homeworks 
+#especiallly are related to the collaboration and 
 
-probably multiple chunks are required, make sure that you include betweenness and membership in the largest component 
-
-```{r prepare data frames for this }
 grades_2 <- read.csv("Grades_Imputed.csv",as.is = T,strip.white = T)
 grades_3 <- rbind(grades_2,grades)
 grades_3 <- grades_3[!duplicated(grades_3$code),]
 grades_3 <- grades_3[order(grades_3$code),]
 
+```
+
+
+
+
+```{r prepare data frames for this}
 create_data_for_model <- function(spec_graph,grade_info = grades_3, hw_num=1){
   members <- V(spec_graph)$name
   df <- grade_info
@@ -174,23 +181,10 @@ create_data_for_model <- function(spec_graph,grade_info = grades_3, hw_num=1){
           
         }
       }
-      
-      
-      
-      #if(length(neigh_in) > 0){
-      #  df$Ave_Score_of_Helpers[df$code == mem] <- mean(df[neigh_in,paste("hw", hw_num,
-      #                                                                  sep="")])
-      #}
-      #if(length(neigh_out) > 0){
-      #  df$Ave_Score_of_Helpees[df$code == mem] <- mean(df[neigh_out,paste("hw", 
-      #                                                           hw_num,
-      #                                                           sep="")])
-      #}
     }
   }
   #remove the people who dropped the class at some point 
   df <- df[!df$did_drop_after4,]
-  
   
   df$Target <- df[,paste("hw",hw_num,sep = "")]
   df <- df[,!(colnames(df) %in% c("Sex","did_drop_after4",
@@ -214,11 +208,7 @@ mse <- function(y , model, new_data = NULL){
 ```
 
 
-
-Try using MCMC to get parameter estimates for each person's ability and for the effect of collaboration
-
 ```{r data set prep for MCMC}
-
 full_data_set <- grades_3
 stats_we_want <- c("Ave_Score_of_Helpers","Constraint","Eigen","Betweenness",
                    "In_Degree","Out_Degree","Ave_Score_of_Helpees","Recip_Degree",
@@ -232,12 +222,7 @@ for(i in 1:k_num_psets){
 full_data_set[,paste("test",1:2,sep = "")] <- full_data_set[,paste("test",1:2,sep = "")] /2
 ```
 
-
-
-
-
 ######Flattening the problem #######
-
 
 ```{r create flattened}
 columns <- c("Code","Grade",stats_we_want)
@@ -265,14 +250,9 @@ mean(flattened$Out_Degree[flattened$In_Degree==0 & thing_for_subsetting < 7]==0)
 ```
 
 
+```{r no cv, include = FALSE}
 
-If i just restrict it to Homeworks, then I can get some results
-I think this is coming from the difficulty in encoding tests in the same format as homeworks. 
-
-It is also possible that this is because tests are not impacted in the same way that homeworks are. Maybe the best predcitors of test grades is just how well you did on homeworks regardless of how you achived that. 
-
-
-```{r no cv}
+#encoding tests is difficult, not really just a hw where you didn't work with anyone
 
 thing_for_subsetting <- 0:(9*110-1) %/% 110
 #flattened <- flattened[thing_for_subsetting < 7,]
@@ -282,13 +262,16 @@ lm1 <- lm(data = flattened,
           Grade ~ Ave_Score_of_Helpers*In_Degree + Code +  Ave_Score_of_Recip*Recip_Degree + 
             Ave_Score_of_Helpees*Out_Degree)
 summary(lm1)
-mean((predict(lm1, newdata = flattened[!(1:(9*110) <= 8*110),]) - flattened[!(1:(9*110) <= 8*110),"Grade"])**2)
-mean((tapply(flattened$Grade[(1:(9*110) <= 8*110)],flattened$Code[(1:(9*110) <= 8*110)],mean) - flattened[!(1:(9*110) <= 8*110),"Grade"])**2)
+mean((predict(lm1,newdata = flattened[!(1:(9*110) <= 8*110),]) - 
+        flattened[!(1:(9*110) <= 8*110),"Grade"])**2)
+mean((tapply(flattened$Grade[(1:(9*110) <= 8*110)],
+             flattened$Code[(1:(9*110) <= 8*110)],mean) -
+        flattened[!(1:(9*110) <= 8*110),"Grade"])**2)
 
 ```
 
 
-```{r no cv again}
+```{r no cv again, include = FALSE}
 lm1 <- lm(data = flattened, 
           Grade ~ Ave_Score_of_Helpers  + Code + Constraint)
 error_dif <- 0
@@ -321,7 +304,7 @@ print(error_dif)
 
 
 
-```{r testing different models}
+```{r testing different models, include = FALSE}
 
 #Help does not help with predictions 
 #In_Degree helps a tiny bit 
@@ -361,7 +344,8 @@ print('hopefully positive')
 print(error_dif)
 
 
-mu1 <- c(lm1$coefficients[1],lm1$coefficients[1] +lm1$coefficients[grepl("Code",names(lm1$coefficients))]) 
+mu1 <- c(lm1$coefficients[1],
+         lm1$coefficients[1] +lm1$coefficients[grepl("Code",names(lm1$coefficients))]) 
 ```
 
 
@@ -379,9 +363,6 @@ flattened_mean  <- flattened
 for(i in 0:8){
   flattened_mean[thing_for_subsetting==i,"Grade"] <-  (flattened_mean[thing_for_subsetting==i,"Grade"] - mean(flattened_mean[thing_for_subsetting==i,"Grade"]))
 }
-
-#boxplot(flattened_mean$Grade[thing_for_subsetting<7]~flattened_mean$In_Degree[thing_for_subsetting<7])
-#boxplot(flattened_mean$Grade[thing_for_subsetting<7]~flattened_mean$Out_Degree[thing_for_subsetting<7])
 ```
 
 ```{r create violin plots}
@@ -596,6 +577,9 @@ expectation <- mean(percentile_df$Helped)
 t.test(percentile_df$Helped[percentile_df$Gender != "?"] ~ percentile_df$Gender[percentile_df$Gender != "?"])
 
 t.test(percentile_df$Helped_Amount[percentile_df$Gender != "?"] ~ percentile_df$Gender[percentile_df$Gender != "?"])
+t.test(percentile_df$Coef[percentile_df$Gender != "?"] ~ percentile_df$Gender[percentile_df$Gender != "?"])
+t.test(percentile_df$Grade[percentile_df$Gender != "?"] ~ percentile_df$Gender[percentile_df$Gender != "?"])
+
 
 percentile_df %>%
   group_by(Gender) %>%
@@ -674,7 +658,7 @@ abline(lm_con)
 
 
 
-```{r creating time variable}
+```{r creating time variable, include = FALSE}
 ###Lets try fitting two coefficients for each person###
 #One of the coefficients will be their base at the beginning of the year
 #The other coefficient will be their growth during the semester
@@ -688,7 +672,7 @@ flattened_mean$Time[flattened_mean$Time > 2] <- flattened_mean$Time[flattened_me
 flattened_mean$Time[flattened_mean$Time == 8] <- 3
 ```
 
-```{r fitting with growth didnt work}
+```{r fitting with growth didnt work, include = FALSE}
 
 thing_for_subsetting <- 0:(9*110-1) %/% 110
 n_folds <- 9
@@ -828,10 +812,10 @@ mean(errors_baseline ** 2)
 
 
 ######comparing predictions with network vs. no information####
-Don't do tests for this part because I am not learning anythign about them
 
-"Grade ~ Out_Degree\*Ave_Score_of_Helpees + In_Degree \* Ave_Score_of_Helpers" doesn't work super well
 ```{r predicting with just network info}
+#exclude tests because they don't have network information 
+
 thing_for_subsetting <- 0:(9*110-1) %/% 110
 lm_list <- list()
 
@@ -962,12 +946,16 @@ barplot(rf1$importance,beside = T,
 
 ```{r barplot comparing methods for paper}
 
-to_plot <- c((error_lm_total + error_dif)/7, 22.55918, error_rf_total / 7)
-names(to_plot) <- c("Baseline","Random Forest:\n Only Network",
-                    "Random Forest:\n Network and Others' Grades")
+to_plot <- c((error_lm_total + error_dif)/7, 22.55918, error_rf_total / 7,
+             13.5,12.6)
+names(to_plot) <- c("Baseline:\n No Information","Random Forest:\n Only Network",
+                    "Random Forest:\nNetwork and Others' Grades",
+                    "Baseline:\nStudent's Average",
+                    "Linear Model:\nAll Information")
 barplot(to_plot,cex.names = .9,
         main = "Mean Squared Error for Different Methods",
-        col = nice_colors)
+        col = nice_colors[c(4,2,3,1,5)],
+        ylab = "Mean Squared Error")
 
 ```
 

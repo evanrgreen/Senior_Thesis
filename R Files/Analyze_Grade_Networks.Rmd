@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = FALSE, eval = TRUE)
 
 ```{r setwd and load packages and data }
 library(igraph)
+library(stats4)
 library(poweRlaw)
 library(ggplot2)
 library(reshape2)
@@ -82,21 +83,15 @@ edge_lists <- lapply(raw_collabs,create_edge_list,100)
 people_who_dropped <- grades[grades$did_drop_after4,1]
 lapply(edge_lists, function(x) sum(x[,1] %in% people_who_dropped | x[,2] %in% people_who_dropped))
 
-#my plan is 
 
 people_who_dropped <- grades[grades$did_drop_immediately,1]
-
-
-
 
 remove_edge_mistakes <- function(edges, banned_people = people_who_dropped){
   column_1 <- edges[,1] %in% banned_people
   column_2 <- edges[,2] %in% banned_people
   return(edges[!column_1 & !column_2, ])
 }
-
 edge_lists <- lapply(edge_lists,remove_edge_mistakes)
-
 create_graph_list <- function(edges){
   graphs <- list()
   for(i in 1:length(edges)){
@@ -115,10 +110,8 @@ graphs <- create_graph_list(edge_lists)
 ```
 
 ```{r correlations of grades}
-
 qplot(x=Var1, y=Var2, data=melt(cor(grades[!grades$did_drop_after4 & grades$test1!=0 & grades$test2 != 0,3:11])), fill=value, geom="tile") +
   scale_fill_gradient2(limits=c(-1, 1))
-
 
 correlations <- cor(grades[!grades$did_drop_after4 & grades$test1!=0 & grades$test2 != 0,3:11])
 barplot((colSums(correlations)-1)/8)
@@ -134,10 +127,6 @@ grades_2 <- read.csv("Grades_Imputed.csv",as.is = T,strip.white = T)
 subset_for_grade_summary <- !grades_2$did_drop_after4
 grades_2 <- grades_2[subset_for_grade_summary,]
 grades_2[,grep("test",colnames(grades_2))] <- grades_2[,grep("test",colnames(grades_2))]/2
-
-
-
-
 
 grades_by_gender <- grades_2[,-1] %>%
   group_by(Sex) %>%
@@ -156,8 +145,6 @@ grades_averages <- grades_2[,-1] %>%
   summarise_if(is.numeric, funs(mean,median))
 
 plotTop <- 45
-
-
 barplot(height = as.matrix(grades_by_gender[2:3,-1]),
         beside = TRUE, las = 1,
         col = nice_colors[1:2],
@@ -216,8 +203,6 @@ for(i in 1:length(edge_lists)){
       mean(c(nrow(edge_lists[[i]]),nrow(edge_lists[[ii]])))
   }
 }
-
-
 #average overlap
 (mean(as.matrix((repeated_edges))) * 49 - 7)/42
 #min overlap 
@@ -324,12 +309,9 @@ edges_num_appeared_accounted_for <- edges_num_appeared * 1:k_num_psets
 barplot(edges_num_appeared)
 barplot(edges_num_appeared_accounted_for)
 
-
 edges_num_appeared_pct<-round(edges_num_appeared_accounted_for / sum(edges_num_appeared_accounted_for), 2)
 
 barplot(edges_num_appeared_pct)
-
-
 pie(edges_num_appeared_accounted_for)
 
 
@@ -560,7 +542,7 @@ same_gender_edges <- count_same_gender(diff_begin_to_end)
 total_new_edges <- ecount(diff_begin_to_end)
 
 ####test if the assortivity increase could happen by chance ####
-num_trials <- 10 ** 4
+num_trials <- 10 ** 1 #change to 4 if actually running 
 assort_trials <- numeric(num_trials)
 same_gender_trials <- numeric(num_trials)
 for(trial in 1:num_trials){
@@ -1002,4 +984,17 @@ print(bs$p)
 }
 ```
 
+```{r differences in those dropping the class after iniitially signing up}
+women <- rep(0,32)
+women[1:23] <- 1
+men <- rep(0,100)
+men[1:86] <- 1
+queer <- rep(0,2)
+queer[1] <- 1 
+
+t.test(c(women),men)
+
+barplot(c(mean(women),mean(men),mean(queer)),beside = T)
+#nope, not significant
+```
 
