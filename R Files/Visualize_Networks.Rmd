@@ -123,12 +123,12 @@ for(i in 1:k_num_psets){
 #save the layout so all the sociograms are in the same diagram
 save_layout <- layout_with_fr(g_full) 
 
-
+save_layout <- layout_with_fr(graphs[[1]]%u% graphs[[7]])
 ```
 
 
 ```{r visualize the graphs, include=TRUE}
-save_layout <- layout_with_fr(graphs[[1]]%u% graphs[[7]])
+
 
 for(i in 1:k_num_psets){
   png(filename = paste("Problem_Set_",i,".png",sep = ""), 
@@ -138,7 +138,7 @@ for(i in 1:k_num_psets){
     to_exclude <- grades$code[grades$did_drop_after4]
   }
   plot(graphs[[i]],
-       edge.arrow.size=.2,
+       edge.arrow.size=.1,
        edge.width = .4,
        vertex.frame.color=nice_colors[as.numeric(as.factor(V(graphs[[i]])$Sex))],
        vertex.size=grades[!grades$code %in% to_exclude,paste("hw",i,sep="")]/ 9,
@@ -149,9 +149,9 @@ for(i in 1:k_num_psets){
        main = paste("Problem Set",i),
        layout = layout_with_fr(graphs[[i]]),
        rescale=T)
-   legend("topright",col =nice_colors[c(3,2,1)],
-         legend = c("M","F","?"),pch= 16,cex=.8,
-         bty="n")
+   legend("topright",col = nice_colors[c(3,2,1)],
+         legend = c("M","F","?","Low Grade","High Grade"),pch= 16,cex=.56,
+         pt.cex = c(1,1,1,.4,1))
    dev.off()
 }
 
@@ -180,6 +180,7 @@ grades[grades$code %in% setdiff(a,b),]
 
 
 ```{r, include = FALSE}
+people_who_dropped <- grades$code[grades$did_drop_immediately]
 adg <- lapply(graphs, get.adjacency)
 adg <- lapply(adg, as.matrix)
 
@@ -193,8 +194,12 @@ a <- networkDynamic(network.list=networks,vertex.pid = "vertex.names")
 
 
 for_vertex_col <- nice_colors[as.numeric(as.factor(grades$Sex[!grades$code %in% people_who_dropped]))]
+for(i in 1:length(a$val)){
+  a$val[[i]]["col"] <- for_vertex_col[i]
+}
+
 render.d3movie(a,displaylabels=TRUE,
-               vertex.col = for_vertex_col,
+               vertex.col =for_vertex_col,
                label = NA,
                animationDuration=1000,
                vertex.cex = rowMeans(grades[!grades$code %in% people_who_dropped,3:9])/30)

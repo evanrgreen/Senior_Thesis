@@ -372,8 +372,11 @@ p <- p + geom_violin(color = "grey50") +
   stat_summary(fun.y=mean, geom="point", size=2, colour="blue") +  
   labs(x="In-Degree",y="Grade") + theme(legend.position="none") +
   ggtitle(expression(atop("Distribution of Grades by In-Degree", 
-                          atop(italic("Means visualized as points"), ""))))
-p
+                          atop(italic("Means visualized as points"), ""))))+
+  theme(plot.title = element_text(hjust = 0.5,size = 22),
+        axis.text=element_text(size=16),
+        axis.title=element_text(size=20))
+
 ggsave("Grades_by_In_Degree.png", plot = p,
        width = 7, height = 7, units = "in")
 
@@ -391,7 +394,10 @@ p <- p + geom_violin(color = "grey50") +
   stat_summary(fun.y=mean, geom="point", size=2, colour="blue") +  
   labs(x="Out-Degree",y="Grade") + theme(legend.position="none") +
   ggtitle(expression(atop("Distribution of Grades by Out-Degree",
-                          atop(italic("Means visualized as points"), ""))))
+                          atop(italic("Means visualized as points"), ""))))+
+    theme(plot.title = element_text(hjust = 0.5,size = 22),
+        axis.text=element_text(size=16),
+        axis.title=element_text(size=20))
 p
 
 ggsave("Grades_by_Out_Degree.png", plot = p,
@@ -510,8 +516,6 @@ stargazer(lm2)
 ```
 
 
-
-This hsould probably be moved down to the lower section
 ```{r analyze main regression results}
 mean(lm1$residuals**2)
 mean((flattened_mean$Grade-rep(tapply(flattened_mean$Grade,flattened_mean$Code,mean),9))**2)
@@ -949,13 +953,14 @@ barplot(rf1$importance,beside = T,
 to_plot <- c((error_lm_total + error_dif)/7, 22.55918, error_rf_total / 7,
              13.5,12.6)
 names(to_plot) <- c("Baseline:\n No Information","Random Forest:\n Only Network",
-                    "Random Forest:\nNetwork and Others' Grades",
+                    "Random Forest:\nNetwork & Others' Grades",
                     "Baseline:\nStudent's Average",
                     "Linear Model:\nAll Information")
-barplot(to_plot,cex.names = .9,
+barplot(to_plot,cex.names = .8,
         main = "Mean Squared Error for Different Methods",
-        col = nice_colors[c(4,2,3,1,5)],
-        ylab = "Mean Squared Error")
+        col = brewer.pal(5,"RdYlBu"),
+        ylab = "Mean Squared Error",
+        ylim = c(0,30))
 
 ```
 

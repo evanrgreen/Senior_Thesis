@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, eval = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
 
 ```
 
@@ -542,7 +542,7 @@ same_gender_edges <- count_same_gender(diff_begin_to_end)
 total_new_edges <- ecount(diff_begin_to_end)
 
 ####test if the assortivity increase could happen by chance ####
-num_trials <- 10 ** 1 #change to 4 if actually running 
+num_trials <- 10 ** 4 #change to 4 if actually running 
 assort_trials <- numeric(num_trials)
 same_gender_trials <- numeric(num_trials)
 for(trial in 1:num_trials){
@@ -556,21 +556,21 @@ for(trial in 1:num_trials){
 }
 
 
-hist(assort_trials,main = "Gender Assortivity in Random Graphs",
+hist(assort_trials,main = "Gender Assortativity in Random Graphs",
      breaks =25, xlim = c(range(assort_trials)[1],
                           max(max(assort_trials),assort_by_pset[k_num_psets])+.03),
-     xlab = "Assortivity",
-     col = rgb(0,1,0,.4))
+     xlab = "Assortativity",
+     col = brewer.pal(5,"Pastel1")[2])
 #abline(v = assort_by_pset[1])
 text(x=assort_by_pset[k_num_psets], y=560,
-     labels='Assortivity\non last homework', col='blue')
+     labels='Assortativity\non last homework', col='blue')
 arrows(x0=assort_by_pset[k_num_psets],
        y0=490, x1=assort_by_pset[k_num_psets], y1=20,
        col='blue', length=0.1, lwd=3)
 mean(assort_trials>=assort_by_pset[k_num_psets])
 
 hist(same_gender_trials,main = "Number of New Edges of the Same Gender in Random Graphs",
-     breaks =25, xlim = range(same_gender_trials) + 3*c(-1,1))
+     breaks = 25, xlim = range(same_gender_trials) + 3*c(-1,1))
 abline(v = same_gender_edges)
 #This is highly significant but not completely unreasonable
 mean(same_gender_trials>same_gender_edges)
