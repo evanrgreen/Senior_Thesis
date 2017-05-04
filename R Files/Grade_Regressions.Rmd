@@ -957,7 +957,8 @@ names(to_plot) <- c("Baseline:\n No Information","Random Forest:\n Only Network"
                     "Baseline:\nStudent's Average",
                     "Linear Model:\nAll Information")
 barplot(to_plot,cex.names = .8,
-        main = "Mean Squared Error for Different Methods",
+        main = "Mean Squared Error for Different Methods
+        in Predicting Homework Grades",
         col = brewer.pal(5,"RdYlBu"),
         ylab = "Mean Squared Error",
         ylim = c(0,30))
