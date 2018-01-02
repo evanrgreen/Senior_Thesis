@@ -27,8 +27,8 @@ genders <- read.csv("CodeGender.csv", as.is = T, strip.white = TRUE)
 grades <- merge(genders, grades, by.x = "code", by.y = "student")
 
 mylist <- list()
-my_files <- paste("CollabPS", 1:7, ".csv", sep = "")
-names_vec <- paste("CollabPS", 1:7, sep = "")
+my_files <- paste("CollabPS", 1:k_num_psets, ".csv", sep = "")
+names_vec <- paste("CollabPS", 1:k_num_psets, sep = "")
 raw_collabs <- lapply(my_files, read.csv, as.is = T, strip.white = TRUE)
 names(raw_collabs) <- names_vec
 ```
@@ -252,8 +252,9 @@ for (i in 1:2) {
 }
 flattened$Code <- as.factor(flattened$Code)
 
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
-mean(flattened$Out_Degree[flattened$In_Degree == 0 & thing_for_subsetting < 7] == 0)
+num_full_students <- num_full_students
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
+mean(flattened$Out_Degree[flattened$In_Degree == 0 & thing_for_subsetting < k_num_psets] == 0)
 ```
 
 
@@ -261,7 +262,7 @@ mean(flattened$Out_Degree[flattened$In_Degree == 0 & thing_for_subsetting < 7] =
 
 # encoding tests is difficult, not really just a hw where you didn't work with anyone
 
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
 # flattened <- flattened[thing_for_subsetting < 7,]
 
 flattened$Code <- as.factor(flattened$Code)
@@ -271,13 +272,13 @@ lm1 <- lm(
     Ave_Score_of_Helpees * Out_Degree
 )
 summary(lm1)
-mean((predict(lm1, newdata = flattened[!(1:(9 * 110) <= 8 * 110), ]) -
-  flattened[!(1:(9 * 110) <= 8 * 110), "Grade"]) ** 2)
+mean((predict(lm1, newdata = flattened[!(1:(9 * num_full_students) <= 8 * num_full_students), ]) -
+  flattened[!(1:(9 * num_full_students) <= 8 * num_full_students), "Grade"]) ** 2)
 mean((tapply(
-  flattened$Grade[(1:(9 * 110) <= 8 * 110)],
-  flattened$Code[(1:(9 * 110) <= 8 * 110)], mean
+  flattened$Grade[(1:(9 * num_full_students) <= 8 * num_full_students)],
+  flattened$Code[(1:(9 * num_full_students) <= 8 * num_full_students)], mean
 ) -
-  flattened[!(1:(9 * 110) <= 8 * 110), "Grade"]) ** 2)
+  flattened[!(1:(9 * num_full_students) <= 8 * num_full_students), "Grade"]) ** 2)
 ```
 
 
@@ -289,7 +290,7 @@ lm1 <- lm(
 error_dif <- 0
 ability_0 <- rowMeans(full_data_set[, grepl("hw|test", colnames(full_data_set))])
 for (i in 1:k_num_psets) {
-  mu1 <- predict(lm1, newdata = flattened[0:(9 * 110 - 1) %/% 110 == (i - 1), ])
+  mu1 <- predict(lm1, newdata = flattened[0:(9 * num_full_students - 1) %/% num_full_students == (i - 1), ])
 
   print(i)
   error_dif <- error_dif - mean((full_data_set[, paste("hw", i, sep = "")] - mu1) ** 2)
@@ -299,7 +300,7 @@ for (i in 1:k_num_psets) {
 }
 print("test")
 for (i in 1:2) {
-  mu1 <- predict(lm1, newdata = flattened[0:(9 * 110 - 1) %/% 110 == (i + 6), ])
+  mu1 <- predict(lm1, newdata = flattened[0:(9 * num_full_students - 1) %/% num_full_students == (i + 6), ])
   print(i)
   error_dif <- error_dif - mean((full_data_set[, paste("test", i, sep = "")] - mu1) ** 2)
   error_dif <- error_dif + mean((full_data_set[, paste("test", i, sep = "")] - ability_0) ** 2)
@@ -323,7 +324,7 @@ print(error_dif)
 # Constraint alone doesn't help
 # Eigen is a bad predictor
 
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
 
 error_dif <- 0
 ability_0 <- rowMeans(full_data_set[, grepl("hw|test", colnames(full_data_set))])
@@ -385,7 +386,7 @@ for (i in 0:8) {
 
 ```{r create violin plots}
 p <- ggplot(
-  flattened_mean[thing_for_subsetting < 7 & flattened_mean$In_Degree < 4, ],
+  flattened_mean[thing_for_subsetting < k_num_psets & flattened_mean$In_Degree < 4, ],
   aes(factor(In_Degree), Grade)
 )
 p <- p + geom_violin(color = "grey50") +
@@ -414,7 +415,7 @@ flattened_mean$Code[flattened_mean$Out_Degree >= 10]
 for_plot <- flattened_mean
 for_plot$Out_Degree[for_plot$Out_Degree > 3] <- "4+"
 
-p <- ggplot(for_plot[thing_for_subsetting < 7, ], aes(factor(Out_Degree), Grade))
+p <- ggplot(for_plot[thing_for_subsetting < k_num_psets, ], aes(factor(Out_Degree), Grade))
 
 p <- p + geom_violin(color = "grey50") +
   stat_summary(fun.y = mean, geom = "point", size = 2, colour = "blue") +
@@ -441,7 +442,7 @@ ggsave(
 
 ```{r important chunk does cv and skip_test functionality}
 # Difference from the means makes a huge differnce
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
 lm_list <- list()
 
 error_dif <- 0
@@ -539,8 +540,8 @@ mu1$Code <- rownames(mu1)
 
 barplot(
   c(
-    error_lm_total / ifelse(skip_test, 7, 9),
-    (error_lm_total + error_dif) / ifelse(skip_test, 7, 9)
+    error_lm_total / ifelse(skip_test, k_num_psets, 9),
+    (error_lm_total + error_dif) / ifelse(skip_test, k_num_psets, 9)
   ),
   col = nice_colors
 )
@@ -567,7 +568,7 @@ mean((flattened_mean$Grade - rep(tapply(flattened_mean$Grade, flattened_mean$Cod
 
 
 flattened_plus_gender <- merge(
-  flattened_mean[thing_for_subsetting < ifelse(skip_test, 7, 9), ],
+  flattened_mean[thing_for_subsetting < ifelse(skip_test, k_num_psets, 9), ],
   grades, by.x = "Code", by.y = "code"
 )
 flattened_plus_gender <- merge(flattened_plus_gender, mu1)
@@ -607,7 +608,7 @@ grades_by_code <- flattened_plus_gender %>%
 coef_percentiles <- ecdf(to_plot)(to_plot)
 grades_by_code_percentile <- ecdf(grades_by_code$average_grade)(grades_by_code$average_grade)
 
-percentile_df <- data.frame(matrix(NA, nrow = 110, ncol = 3))
+percentile_df <- data.frame(matrix(NA, nrow = num_full_students, ncol = 3))
 colnames(percentile_df) <- c("Coef", "Grade", "Gender")
 percentile_df$Coef <- coef_percentiles
 percentile_df$Grade <- grades_by_code_percentile
@@ -746,7 +747,7 @@ flattened_mean$Time[flattened_mean$Time == 8] <- 3
 
 ```{r fitting with growth didnt work, include = FALSE}
 
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
 n_folds <- 9
 folds <- sample(rep(1:n_folds, length.out = nrow(flattened_mean)))
 error_dif <- 0
@@ -794,7 +795,7 @@ error_lm_total / (error_lm_total + error_dif)
 ff <- Grade~.
 z <- data.frame(matrix(
   0, nrow = nrow(flattened_mean),
-  ncol = nrow(graph_data_sets[[7]])
+  ncol = nrow(graph_data_sets[[k_num_psets]])
 ))
 colnames(z) <- sort(unique(flattened_mean$Code))
 
@@ -841,7 +842,7 @@ x <- lapply(x, as.matrix)
 LL <- function(Code_1 = as.double(spar), membership=x, grades=flattened_mean$Grade) {
   # Find residuals
   #
-  components <- lapply(membership, function(y) y %*% Code_1[1:110])
+  components <- lapply(membership, function(y) y %*% Code_1[1:num_full_students])
   # Calculate the likelihood for the residuals (with mu and sigma as parameters)
   #
   ret_val <- -sum(suppressWarnings(dnorm(grades - components[[1]] * Code_1[111] - components[[2]] * Code_1[112] - components[[3]] * Code_1[113] - components[[4]], 0, Code_1[114], log = T)))
@@ -874,12 +875,12 @@ a$value
 
 ```{r check accuracy of method}
 spar <- as.double(spar)
-components <- lapply(x, function(y) y %*% spar[1:110])
+components <- lapply(x, function(y) y %*% spar[1:num_full_students])
 errors <- flattened_mean$Grade - components[[1]] * spar[111] -
   components[[2]] * spar[112] - components[[3]] * spar[113] - components[[4]]
 mean(errors ** 2)
 spar <- as.double(spar)
-components <- lapply(x, function(y) y %*% a$par[1:110])
+components <- lapply(x, function(y) y %*% a$par[1:num_full_students])
 errors <- flattened_mean$Grade - components[[1]] * a$par[111] -
   components[[2]] * a$par[112] - components[[3]] * a$par[113] - components[[4]]
 mean(errors ** 2)
@@ -897,7 +898,7 @@ mean(errors_baseline ** 2)
 ```{r predicting with just network info}
 # exclude tests because they don't have network information
 
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
 lm_list <- list()
 
 error_dif <- 0
@@ -913,18 +914,18 @@ for (i in 1:k_num_psets) {
     data = flattened_mean,
     Grade  ~ Constraint + (Recip_Degree) + Big_Component +
       (In_Degree == 0) + (Out_Degree == 0),
-    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < 7
+    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < k_num_psets
   )
   lm_list[[i]] <- lm1
   mu1 <- predict(lm1, newdata = flattened_mean[thing_for_subsetting == (i - 1) &
-    thing_for_subsetting < 7, ])
+    thing_for_subsetting < k_num_psets, ])
   rf1 <- randomForest(
     data = flattened_mean,
     Grade  ~ Constraint + Recip_Degree + Big_Component + In_Degree + Out_Degree,
-    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < 7
+    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < k_num_psets
   )
   mu2 <- predict(rf1, newdata = flattened_mean[thing_for_subsetting == (i - 1) &
-    thing_for_subsetting < 7, ])
+    thing_for_subsetting < k_num_psets, ])
 
   print(i)
   error_lm <- mean((flattened_mean[thing_for_subsetting == (i - 1), "Grade"] - mu1) ** 2)
@@ -936,12 +937,12 @@ for (i in 1:k_num_psets) {
   print(paste(error_lm, error_ave, sep = " | "))
 }
 barplot(c(
-  error_lm_total / 7, error_rf_total / 7,
-  (error_lm_total + error_dif) / 7
+  error_lm_total / k_num_psets, error_rf_total / k_num_psets,
+  (error_lm_total + error_dif) / k_num_psets
 ), col = nice_colors)
 
-print(error_rf_total / 7)
-print((error_lm_total + error_dif) / 7)
+print(error_rf_total / k_num_psets)
+print((error_lm_total + error_dif) / k_num_psets)
 
 (error_lm_total / (error_lm_total + error_dif))
 (error_rf_total / (error_lm_total + error_dif))
@@ -950,14 +951,14 @@ lm1 <- lm(
   data = flattened_mean,
   Grade  ~ Constraint + (Recip_Degree) + Big_Component
     + (In_Degree == 0) + (Out_Degree == 0),
-  subset = thing_for_subsetting < 7
+  subset = thing_for_subsetting < k_num_psets
 )
 
 rf1 <- randomForest(
   data = flattened_mean,
   Grade  ~ Constraint + Recip_Degree + Big_Component
     + In_Degree + Out_Degree,
-  subset = thing_for_subsetting < 7
+  subset = thing_for_subsetting < k_num_psets
 )
 
 visreg(lm1)
@@ -972,7 +973,7 @@ barplot(
 
 ```{r including grades for collaborators}
 
-thing_for_subsetting <- 0:(9 * 110 - 1) %/% 110
+thing_for_subsetting <- 0:(9 * num_full_students - 1) %/% num_full_students
 lm_list <- list()
 
 error_dif <- 0
@@ -992,19 +993,19 @@ for (i in 1:k_num_psets) {
   lm1 <- lm(
     data = flattened_mean,
     formula = lm_formula,
-    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < 7
+    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < k_num_psets
   )
   lm_list[[i]] <- lm1
   mu1 <- predict(lm1, newdata = flattened_mean[thing_for_subsetting == (i - 1) &
-    thing_for_subsetting < 7, ])
+    thing_for_subsetting < k_num_psets, ])
   rf1 <- randomForest(
     data = flattened_mean,
     rf_formula,
-    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < 7,
+    subset = thing_for_subsetting != (i - 1) & thing_for_subsetting < k_num_psets,
     ntree = 500
   )
   mu2 <- predict(rf1, newdata = flattened_mean[thing_for_subsetting == (i - 1) &
-    thing_for_subsetting < 7, ])
+    thing_for_subsetting < k_num_psets, ])
 
   print(i)
   error_lm <- mean((flattened_mean[thing_for_subsetting == (i - 1), "Grade"] - mu1) ** 2)
@@ -1016,25 +1017,25 @@ for (i in 1:k_num_psets) {
   print(paste(error_lm, error_ave, sep = " | "))
 }
 barplot(c(
-  error_lm_total / 7, error_rf_total / 7,
-  (error_lm_total + error_dif) / 7
+  error_lm_total / k_num_psets, error_rf_total / k_num_psets,
+  (error_lm_total + error_dif) / k_num_psets
 ), col = nice_colors)
 
 (error_lm_total / (error_lm_total + error_dif))
 (error_rf_total / (error_lm_total + error_dif))
 
-print(error_rf_total / 7)
+print(error_rf_total / k_num_psets)
 
 lm1 <- lm(
   data = flattened_mean,
   lm_formula,
-  subset = thing_for_subsetting < 7
+  subset = thing_for_subsetting < k_num_psets
 )
 
 rf1 <- randomForest(
   data = flattened_mean,
   rf_formula,
-  subset = thing_for_subsetting < 7
+  subset = thing_for_subsetting < k_num_psets
 )
 
 visreg(lm1)
@@ -1052,7 +1053,7 @@ barplot(
 ```{r barplot comparing methods for paper}
 
 to_plot <- c(
-  (error_lm_total + error_dif) / 7, 22.55918, error_rf_total / 7,
+  (error_lm_total + error_dif) / k_num_psets, 22.55918, error_rf_total / k_num_psets,
   13.5, 12.6
 )
 names(to_plot) <- c(
@@ -1085,15 +1086,15 @@ folds <- sample(rep(1:n_folds, length.out = nrow(tests)))
 for (i in 3:ncol(flattened_mean)) {
   if (is.numeric(flattened_mean[, i])) {
     tests[, colnames(flattened_mean)[i]] <- rep(tapply(
-      flattened_mean[thing_for_subsetting < 7, i],
-      flattened_mean$Code[thing_for_subsetting < 7],
+      flattened_mean[thing_for_subsetting < k_num_psets, i],
+      flattened_mean$Code[thing_for_subsetting < k_num_psets],
       mean
     ), 2)
   }
 }
 tests$Ave_Grade <- rep(tapply(
-  flattened_mean[thing_for_subsetting < 7, "Grade"],
-  flattened_mean$Code[thing_for_subsetting < 7],
+  flattened_mean[thing_for_subsetting < k_num_psets, "Grade"],
+  flattened_mean$Code[thing_for_subsetting < k_num_psets],
   mean
 ), 2)
 lm_t <- stepAIC(lm(
@@ -1142,7 +1143,7 @@ stargazer(lm_t)
 #simulating data to test for chance that this was just random 
 ```{r null hypothesis}
 empirical_sd <- 3.2 # this is from the residual standard error of a couple different models
-just_hw <- thing_for_subsetting < 7
+just_hw <- thing_for_subsetting < k_num_psets
 empirical_sd_no_person <- sd(flattened_mean$Grade[just_hw])
 n_trials <- 100
 
@@ -1193,18 +1194,18 @@ for (i in 1:n_trials) {
   helpers <- strsplit(flattened_mean$Helpers, split = "|", fixed = T)
   helpees <- strsplit(flattened_mean$Helpees, split = "|", fixed = T)
   recips <- strsplit(flattened_mean$Recips, split = "|", fixed = T)
-  for (j in 1:770) {
+  for (j in 1:(k_num_psets * num_full_students)) {
     a <- ifelse(length(helpers[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% helpers[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
     b <- ifelse(length(helpees[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% helpees[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
     d <- ifelse(length(helpees[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% recips[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
 
     flattened_mean$Ave_Score_of_Helpers_Trial[j] <- ifelse(length(a) > 0 & !any(is.na(a)), mean(a), 0)
@@ -1259,7 +1260,7 @@ apply(results_mat, 2, function(x) round(mean(x), 2))
 
 ```{r other hypothesis}
 empirical_sd <- 3.2 # this is from the residual standard error of a couple different models
-just_hw <- thing_for_subsetting < 7
+just_hw <- thing_for_subsetting < k_num_psets
 empirical_sd_no_person <- sd(flattened_mean$Grade[just_hw])
 n_trials <- 100
 ability_0 <- tapply(flattened_mean$Grade, flattened_mean$Code, mean)
@@ -1292,18 +1293,18 @@ for (i in 1:n_trials) {
   helpers <- strsplit(flattened_mean$Helpers, split = "|", fixed = T)
   helpees <- strsplit(flattened_mean$Helpees, split = "|", fixed = T)
   recips <- strsplit(flattened_mean$Recips, split = "|", fixed = T)
-  for (j in 1:770) {
+  for (j in 1:(k_num_psets * num_full_students)) {
     a <- ifelse(length(helpers[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% helpers[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
     b <- ifelse(length(helpees[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% helpees[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
     d <- ifelse(length(helpees[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% recips[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
 
     flattened_mean$Ave_Score_of_Helpers_Trial[j] <- ifelse(length(a) > 0 & !any(is.na(a)), mean(a), 0)
@@ -1311,7 +1312,7 @@ for (i in 1:n_trials) {
     flattened_mean$Ave_Score_of_Recip_Trial[j] <- ifelse(length(d) > 0 & !any(is.na(d)), mean(d), 0)
   }
 
-  for (j in 1:770) {
+  for (j in 1:(k_num_psets * num_full_students)) {
     if (flattened_mean$Ave_Score_of_Helpees_Trial[j] == 0 & flattened_mean$Ave_Score_of_Helpers_Trial[j] == 0) {
       flattened_mean$Trial[j] <- flattened_mean$Trial[j]
     } else if (flattened_mean$Ave_Score_of_Helpees_Trial[j] == 0) {
@@ -1327,18 +1328,18 @@ for (i in 1:n_trials) {
       )
     }
   }
-  for (j in 1:770) {
+  for (j in 1:(k_num_psets * num_full_students)) {
     a <- ifelse(length(helpers[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% helpers[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
     b <- ifelse(length(helpees[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% helpees[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
     d <- ifelse(length(helpees[[j]]) > 0,
       flattened_mean$Trial[flattened$Code %in% recips[[j]] &
-        thing_for_subsetting == (j - 1) %/% 110], 0
+        thing_for_subsetting == (j - 1) %/% num_full_students], 0
     )
 
     flattened_mean$Ave_Score_of_Helpers_Trial[j] <- ifelse(length(a) > 0 &

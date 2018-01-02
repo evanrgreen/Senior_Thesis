@@ -31,8 +31,8 @@ genders <- read.csv("CodeGender.csv", as.is = T, strip.white = TRUE)
 grades <- merge(genders, grades, by.x = "code", by.y = "student")
 
 mylist <- list()
-my_files <- paste("CollabPS", 1:7, ".csv", sep = "")
-names_vec <- paste("CollabPS", 1:7, sep = "")
+my_files <- paste("CollabPS", 1:k_num_psets, ".csv", sep = "")
+names_vec <- paste("CollabPS", 1:k_num_psets, sep = "")
 raw_collabs <- lapply(my_files, read.csv, as.is = T, strip.white = TRUE)
 names(raw_collabs) <- names_vec
 ```
@@ -91,6 +91,7 @@ remove_edge_mistakes <- function(edges, banned_people = people_who_dropped) {
   return(edges[!column_1 & !column_2, ])
 }
 edge_lists <- lapply(edge_lists, remove_edge_mistakes)
+
 create_graph_list <- function(edges) {
   graphs <- list()
   for (i in 1:length(edges)) {
@@ -110,12 +111,13 @@ graphs <- create_graph_list(edge_lists)
 ```
 
 ```{r correlations of grades}
+grade_cols <-  3:11
 qplot(x = Var1, y = Var2, 
-      data = melt(cor(grades[!grades$did_drop_after4 & grades$test1 != 0 & grades$test2 != 0, 3:11])),
+      data = melt(cor(grades[!grades$did_drop_after4 & grades$test1 != 0 & grades$test2 != 0, grade_cols])),
       fill = value, geom = "tile") +
   scale_fill_gradient2(limits = c(-1, 1))
 
-correlations <- cor(grades[!grades$did_drop_after4 & grades$test1 != 0 & grades$test2 != 0, 3:11])
+correlations <- cor(grades[!grades$did_drop_after4 & grades$test1 != 0 & grades$test2 != 0, grade_cols])
 barplot((colSums(correlations) - 1) / 8)
 ```
 
@@ -202,7 +204,7 @@ grades_2
 ```{r see which edges repeat}
 # A lot of the edges are edges that appear 7 times, 48% of edges either 6 or 7
 
-repeated_edges <- as.data.frame(matrix(NA, ncol = 7, nrow = k_num_psets))
+repeated_edges <- as.data.frame(matrix(NA, ncol = k_num_psets, nrow = k_num_psets))
 colnames(repeated_edges) <- 1:k_num_psets
 rownames(repeated_edges) <- 1:k_num_psets
 
@@ -226,11 +228,11 @@ lines(as.matrix(repeated_edges)[seq(2, length.out = 6, by = 8)])
 
 # Ties are not lost independently, people will go in and out relationships it seems but
 # lets investigate a little more
-
+first_grade_col <- 3 
 students <- unique(grades$code)
 possible_ties <- data.frame(expand.grid(students, students))
-possible_ties[, 3:(3 + k_num_psets - 1)] <- 0
-colnames(possible_ties) <- c("Source", "Sink", paste("hw", 1:7, sep = ""))
+possible_ties[, first_grade_col:(first_grade_col + k_num_psets - 1)] <- 0
+colnames(possible_ties) <- c("Source", "Sink", paste("hw", 1:k_num_psets, sep = ""))
 
 charity_ties <- possible_ties
 
@@ -253,27 +255,28 @@ for (i in 1:length(edge_lists)) {
     }
   }
 }
+hw_grade_cols <- 3:9 
 # remove ties that never occur but keep track of the percentage
 possible_ties <- possible_ties[!possible_ties$Source == possible_ties$Sink, ]
-mean(rowSums(possible_ties[, 3:9]) == 0)
+mean(rowSums(possible_ties[, hw_grade_cols]) == 0)
 # 97% of possible ties never occur
 charity_ties <- charity_ties[rowSums(possible_ties[, 3:9]) != 0, ]
 possible_ties <- possible_ties[rowSums(possible_ties[, 3:9]) != 0, ]
 
-mean(rowSums(possible_ties[, 3:9]))
+mean(rowSums(possible_ties[, hw_grade_cols]))
 # Average tie exists 3 times once it occurs
 
 # just a check that I'm doing it right
-barplot(table(rowSums(possible_ties[, 3:9])) * 1:7)
+barplot(table(rowSums(possible_ties[, hw_grade_cols])) * 1:k_num_psets)
 
 # Takes in a row and sees how many times it changes from 0 to 1
-x <- possible_ties[1, 3:9]
+x <- possible_ties[1, hw_grade_cols]
 count_switches <- function(x) {
   return(sum(x[-length(x)] != x[-1]))
 }
-possible_ties$Switches <- apply(possible_ties[, 3:9], 1, count_switches)
+possible_ties$Switches <- apply(possible_ties[, hw_grade_cols], 1, count_switches)
 table(possible_ties$Switches)
-possible_ties$Count <- rowSums(possible_ties[, 3:9])
+possible_ties$Count <- rowSums(possible_ties[, hw_grade_cols])
 table(possible_ties$Switches, possible_ties$Count)
 tapply(possible_ties$Switches, possible_ties$Count, mean)
 
@@ -356,7 +359,7 @@ sum(!edges_seven_times_reciprocal)
 # One thing to look at could be if the people who are helped more than they help
 # do worse than those who help them, especially on tests
 # Now, the question is why do relationships not change as much as random chance?
-possible_ties$First <- apply(possible_ties[, 3:9], 1, function(x) which(x == 1)[1])
+possible_ties$First <- apply(possible_ties[, hw_grade_cols], 1, function(x) which(x == 1)[1])
 tapply(possible_ties$First, possible_ties$Count, mean)
 rowMeans(keep_track_first)
 
@@ -376,7 +379,7 @@ legend(
   bty = "n"
 )
 
-possible_ties$Last <- apply(possible_ties[, 3:9], 1, function(x) which(x == 1)[sum(x == 1)])
+possible_ties$Last <- apply(possible_ties[, hw_grade_cols], 1, function(x) which(x == 1)[sum(x == 1)])
 real_last <- tapply(possible_ties$Last, possible_ties$Count, mean)
 
 table(possible_ties$Last, possible_ties$Count)
@@ -431,7 +434,7 @@ possible_ties$Tie_Class <- paste(
 )
 
 
-column_names <- colnames(possible_ties[, 3:9])
+column_names <- colnames(possible_ties[, hw_grade_cols])
 
 
 
@@ -447,8 +450,8 @@ possible_ties$Recip_pct <- 0
 possible_ties$Transitivity_PCT <- 0
 possible_ties$Charity_PCT <- 0
 for (i in 1:nrow(possible_ties)) {
-  possible_ties$Grades_Sink_Collab[i] <- mean(as.numeric(grades_for_ties[grades_for_ties$code == possible_ties$Sink[i], column_names[possible_ties[i, 3:9] == 1]]))
-  possible_ties$Grades_Source_Collab[i] <- mean(as.numeric(grades_for_ties[grades_for_ties$code == possible_ties$Source[i], column_names[possible_ties[i, 3:9] == 1]]))
+  possible_ties$Grades_Sink_Collab[i] <- mean(as.numeric(grades_for_ties[grades_for_ties$code == possible_ties$Sink[i], column_names[possible_ties[i, hw_grade_cols] == 1]]))
+  possible_ties$Grades_Source_Collab[i] <- mean(as.numeric(grades_for_ties[grades_for_ties$code == possible_ties$Source[i], column_names[possible_ties[i, hw_grade_cols] == 1]]))
   possible_ties$Grades_Source[i] <- mean(as.numeric(grades_for_ties[grades_for_ties$code == possible_ties$Source[i], column_names]))
   possible_ties$Grades_Sink[i] <- mean(as.numeric(grades_for_ties[grades_for_ties$code == possible_ties$Sink[i], column_names]))
 
@@ -466,7 +469,7 @@ for (i in 1:nrow(possible_ties)) {
       get_collaborators(possible_ties$Source[i]),
       get_collaborators(possible_ties$Sink[i])
     ))
-  possible_ties$Charity_PCT[i] <- mean(charity_ties[i, 3:9][possible_ties[i, 3:9] == 1])
+  possible_ties$Charity_PCT[i] <- mean(charity_ties[i, hw_grade_cols][possible_ties[i, hw_grade_cols] == 1])
 }
 ```
 
@@ -578,7 +581,7 @@ for (trial in 1:num_trials) {
   assort_trials[trial] <- assortativity_nominal(g_trial, as.factor(V(g_trial)$Sex))
   gad <- g_trial %m% core_network
   same_gender_trials[trial] <- count_same_gender(gad)
-  if (trial %% 500 == 0) {
+  if (trial %% 500 == 0) { #Give progress reports
     print(trial)
   }
 }
@@ -734,7 +737,7 @@ names(p_vals) <- c(
   "same v. different", "female v. male"
 )
 
-
+#have to adjust for multiple comparisons
 p.adjust(p_vals, method = "holm", n = length(p_vals))
 p.adjust(p_vals, method = "holm", n = length(p_vals))[
   p.adjust(p_vals, method = "holm", n = length(p_vals)) < .05
@@ -1054,7 +1057,7 @@ bs <- bootstrap_p(data_pl)
 print(bs$p)
 
 # http://stats.stackexchange.com/questions/108843/how-to-test-whether-a-distribution-follows-a-power-law
-for (i in 1:7) {
+for (i in 1:k_num_psets) {
   data_pl <- displ$new(igraph::degree(graphs[[i]], mode = "out") + 1)
   est <- estimate_xmin(data_pl)
   data_pl$xmin <- est$xmin
